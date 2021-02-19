@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+
+import rospy
+import actionlib
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+
+# Generate a goal position and orientation
+def generate_goal(x, y, w):
+    goal = MoveBaseGoal()
+    goal.target_pose.header.frame_id = "map"
+    goal.target_pose.header.stamp = rospy.Time.now()
+    goal.target_pose.pose.position.x = x
+    goal.target_pose.pose.position.y = y
+    goal.target_pose.pose.orientation.w = w
+    return goal
+
+
+if __name__ == '__main__':
+    rospy.init_node('go_to_goal')
+    client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+    client.wait_for_server()
+
+    
+    first_goal = generate_goal(-1.0, 1.0, 1.0)
+    client.send_goal(first_goal)
+    client.wait_for_result()
+    second_goal = generate_goal(-1.0, -1.0, 1.0)
+    client.send_goal(second_goal)
+    client.wait_for_result()

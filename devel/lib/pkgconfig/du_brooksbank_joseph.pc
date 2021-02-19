@@ -1,0 +1,8 @@
+prefix=/home/jbrooksbank/catkin_ws/devel
+
+Name: du_brooksbank_joseph
+Description: Description of du_brooksbank_joseph
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

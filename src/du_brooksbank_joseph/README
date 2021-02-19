@@ -1,0 +1,19 @@
+
+
+
+
+#### TO INSTALL
+* move this entire folder (du_brooksbank_joseph) to the src root of your catkin workspace (something like ~/catkin_ws/src)
+* run catkin_build from the root of your catkin workspace ( ex ~/catkin_ws/ )
+* source from .../catkin_ws/devel/setup.(bash|zsh) depending on what shell you are using
+
+### TO RUN
+Assuming roscore and turltesim_node are running and you have the workspace sourced from above:
+
+rosrun du_brooksbank_joseph du_brooksbank_joseph.py
+
+### NOTES
+
+As I am an undergrad, I did not implement closed loop control. The D may not be perfectly symmetrical, depending on
+how much the robot slipped during movement.
+

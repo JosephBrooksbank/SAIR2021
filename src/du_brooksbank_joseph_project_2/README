@@ -1,0 +1,42 @@
+#### TO INSTALL
+* move this entire folder (du_brooksbank_joseph_project_2) to the src root of your catkin workspace (something like ~/catkin_ws/src)
+* run catkin_make from the root of your catkin workspace ( ex ~/catkin_ws/ )
+* source from .../catkin_ws/devel/setup.(bash|zsh) depending on what shell you are using
+
+
+#### TO RUN
+
+## Ensure that roscore, Gazebo and the slam mapping are both running:
+roscore
+roslaunch turtlebot3_gazebo turtlebot3_stage_4.launch
+roslaunch turtlebot3_slam turtlebot3_slam.launch slam_methods:=gmapping
+
+## Ensure that you are sourced properly as described in step 3 of #### TO INSTALL
+
+## Run the launch script from this package
+roslaunch du_brooksbank_joseph_project_2 turtlebot3_navigation.launch
+
+## if you wish to view the current coordinate data of the robot, run in a new terminal:
+rostopic echo /turtle_position
+
+## To view information in RViz:
+# Click "Add"
+# for raw frontiers, add a 'map' which subscribes to the topic 'frontiers_map'
+# for clustered frontiers/observation points, add a 'markers array' and subscribe to topic 'frontier_markers'.
+
+## PART 1 (DEPRECATED)
+# the robot should begin moving toward its first goal of  (-1.0, 1.0, 0.0), and then to (-1.0, -1.0, 0), where it will stop.
+
+## PART 2 (CURRENT)
+# The robot will not move, however clusters of frontier data will appear, along with red circles to mark the centers of each frontier.
+
+## Sample video:
+https://youtu.be/af0odgvD_jo
+
+### Notes: 
+# As you mentioned in Project 1, my laser output seems to be more sparse than yours is in the examples. I am not sure
+# Why this is, but it has only minor implications for frontier generation, so I think it works.
+# For clustering, I am using the sklearn AgglomerativeClustering algorithm. It works okay, but definitely some weird things sometimes.
+
+
+

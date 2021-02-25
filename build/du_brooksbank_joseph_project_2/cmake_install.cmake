@@ -53,6 +53,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/du_brooksbank_joseph_project_2" TYPE PROGRAM FILES "/home/jbrooksbank/catkin_ws/build/du_brooksbank_joseph_project_2/catkin_generated/installspace/project2.py")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/du_brooksbank_joseph_project_2" TYPE PROGRAM FILES "/home/jbrooksbank/catkin_ws/build/du_brooksbank_joseph_project_2/catkin_generated/installspace/main.py")
 endif()
 

@@ -29,7 +29,7 @@
   </group>
 
 <!--Node Listener-->
-<node pkg="du_brooksbank_joseph_project_2" type="project2.py"
+<node pkg="du_brooksbank_joseph_project_2" type="main.py"
       name="part2" output="screen" />
 
 </launch>

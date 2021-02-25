@@ -27,7 +27,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph/package.xml"
   "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph/scripts/du_brooksbank_joseph.py"
   "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_2/CMakeLists.txt"
-  "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_2/nodes/project2.py"
+  "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_2/nodes/main.py"
   "/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_2/package.xml"
   "/home/jbrooksbank/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/CMakeLists.txt"
   "/home/jbrooksbank/catkin_ws/src/turtlebot3_simulations/turtlebot3_fake/package.xml"

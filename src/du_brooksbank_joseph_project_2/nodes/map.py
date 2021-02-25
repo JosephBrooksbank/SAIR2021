@@ -1,13 +1,14 @@
 import math
 import numpy
 import random
+
 import nav_msgs.msg
 import rospy
 from sklearn.cluster import AgglomerativeClustering
+from std_msgs.msg import ColorRGBA
+from visualization_msgs.msg import MarkerArray
 
 from drawing_tools import DrawingTools
-from visualization_msgs.msg import MarkerArray, Marker
-from std_msgs.msg import ColorRGBA
 
 
 class Map:
@@ -15,6 +16,10 @@ class Map:
     ROBOT_WIDTH = 4
 
     def __init__(self, **kwargs):
+        """ Keyword Arguments:
+                    data: raw data from sensors to create a map
+                    map_data: previously constructed map to shallow copy
+                    size: previously constructed map, constructs a zero map of the same size and details"""
 
         if "data" in kwargs:
             data = kwargs["data"]
@@ -38,6 +43,7 @@ class Map:
 
         elif "size" in kwargs:
             size = kwargs["size"]
+            assert isinstance(size, Map)
             self.width = size.width
             self.height = size.height
             self.resolution = size.resolution
@@ -46,6 +52,7 @@ class Map:
             self.map_2d = numpy.zeros((self.width, self.height))
 
     def fill_square(self, center, radius, value):
+        # type: ([int, int], int, int) -> None
         """ Fills a square of the value given at the center and radius given, in the 2D array given. """
         width = self.map_2d.shape[0]
         height = self.map_2d.shape[1]
@@ -139,9 +146,13 @@ class FrontierMap(Map):
 class ExploreMap(Map):
     """ Class for Cluster Maps; including generation of map and conversion to visual markers"""
 
+    # through experimentation, this was the best way to cluster
+    NUM_CLUSTERS = 4
+
     def __init__(self, map_data, drawing_tools):
         # type: (FrontierMap, DrawingTools) -> None
         assert isinstance(map_data, FrontierMap)
+
         self.center_points = []
         self.current_goal = None
         self.mark_id = 1
@@ -157,11 +168,9 @@ class ExploreMap(Map):
                 if map_data.map_2d[i, j] != 0:
                     point_array.append([i, j])
 
-            # through experimentation, this was the best way to cluster
-
         try:
 
-            cluster_values = AgglomerativeClustering(n_clusters=4, ).fit_predict(point_array)
+            cluster_values = AgglomerativeClustering(n_clusters=ExploreMap.NUM_CLUSTERS, ).fit_predict(point_array)
             cluster_groups = {}
 
             # There is a cluster labeled "0" by default, which is also my empty space. This caused
@@ -169,7 +178,7 @@ class ExploreMap(Map):
             for i in range(len(cluster_values)):
                 cluster_values[i] += 1
 
-            # Re building a map with the index of the cluster as the value at that position
+            # Re building a map with the cluster number as the value at that spot
             for i in range(len(point_array)):
                 cur_value = cluster_values[i]
 
@@ -206,9 +215,6 @@ class ExploreMap(Map):
 
         colors = {}
         markers = []
-
-        # unique identifier for each sphere marker
-
         for i in range(self.width):
             for j in range(self.height):
                 cluster_value = self.map_2d[i, j]
@@ -221,6 +227,7 @@ class ExploreMap(Map):
                         colors[cluster_value] = temp_color
                         color = temp_color
 
+                    # Map coordinates are in height-width, for some reason
                     xy = self.grid_to_map_coords([j, i])
                     markers.append(self.drawing_tools.make_sphere_marker(xy, 0.1, color, "clusterMap"))
 
@@ -231,12 +238,15 @@ class ExploreMap(Map):
         return MarkerArray(markers)
 
     def grid_to_map_coords(self, xy):
+        # type: ([int,int]) -> [int,int]
+        """ Converts a square in the grid from map sensing into a world coordinate"""
         x = self.resolution * xy[0] + self.origin.position.x
         y = self.resolution * xy[1] + self.origin.position.y
         return [x, y]
 
     def closest_centroid(self, robotXY):
         # type: ([int,int]) -> [int,int]
+        """ Finds the centroid closest to the coordinates given """
         lowest_distance = float('inf')
         # if there are no centroids left, return none
         if len(self.center_points) == 0:
@@ -246,5 +256,4 @@ class ExploreMap(Map):
             if dist < lowest_distance:
                 lowest_distance = dist
                 self.current_goal = xy
-        rospy.loginfo("closest centroid is: " + str(self.current_goal[0]) + "," + str(self.current_goal[1]))
         return self.current_goal

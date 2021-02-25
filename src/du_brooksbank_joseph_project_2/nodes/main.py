@@ -20,19 +20,24 @@ class Project2:
 
         # Latest information from Map Topic
         self.current_raw_map = []
+        # State of exploration
+        self.finished = False
 
         # Publishing bot position
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.rate = rospy.Rate(10.0)
 
+        # Get coordinates of robot in map frame in main
+        self.trans = None
+
         self.pos_post = rospy.Publisher('turtle_position', geometry_msgs.msg.TransformStamped, queue_size=10)
         self.map_post = rospy.Publisher('/frontiers_map', nav_msgs.msg.OccupancyGrid, queue_size=10)
         self.marker_post = rospy.Publisher('/frontier_markers', MarkerArray, queue_size=10)
 
         # Simple Action Client for moving to position
-        client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-        client.wait_for_server()
+        self.move_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+        self.move_client.wait_for_server()
 
         rospy.Subscriber("/map", nav_msgs.msg.OccupancyGrid, self.map_to_frontier_map_callback)
 
@@ -51,12 +56,12 @@ class Project2:
 
             # noinspection PyBroadException
             try:
-                trans = self.tfBuffer.lookup_transform('map', 'base_footprint', rospy.Time())
+                self.trans = self.tfBuffer.lookup_transform('map', 'base_footprint', rospy.Time())
             except:
                 self.rate.sleep()
                 continue
 
-            self.pos_post.publish(trans)
+            self.pos_post.publish(self.trans)
             self.rate.sleep()
 
     def map_to_frontier_map_callback(self, data):
@@ -75,6 +80,47 @@ class Project2:
             # Publishing data
             self.map_post.publish(frontier_map.to_occupancy_grid())
             self.marker_post.publish(cluster_map.to_markers())
+
+            if not self.finished and self.trans is not None:
+                try:
+                    xy = [
+                        self.trans.transform.translation.x,
+                        self.trans.transform.translation.y
+                    ]
+                    result = self.try_goal(cluster_map.closest_centroid(xy))
+                    if result:
+                        rospy.loginfo("Made it to centroid, computing new goal...")
+                    else:
+                        rospy.loginfo("No more centroids, finished!")
+                except rospy.ROSInterruptException:
+                    rospy.loginfo("Failed to make to goal, try again")
+
+    @staticmethod
+    def generate_goal(xy):
+        """ Generate a goal position and orientation inside a MoveBaseGoal() Object """
+        goal = MoveBaseGoal()
+        goal.target_pose.header.frame_id = "map"
+        goal.target_pose.header.stamp = rospy.Time.now()
+        goal.target_pose.pose.position.x = xy[0]
+        goal.target_pose.pose.position.y = xy[1]
+        # goal.target_pose.pose.orientation.w = w
+        return goal
+
+    def try_goal(self, xy):
+
+        goal = Project2.generate_goal(xy)
+        if goal is None:
+            self.finished = True
+            return None
+
+        self.move_client.send_goal(goal)
+        wait = self.move_client.wait_for_result()
+        if not wait:
+            rospy.loginfo("Move failed")
+        else:
+            ret = self.move_client.get_result()
+            if ret:
+                return True
 
 
 if __name__ == '__main__':

@@ -180,8 +180,8 @@ class ClusterMap(Map):
         for clusterID in cluster_groups:
             x_c = y_c = count = 0
             for coord_pair in cluster_groups[clusterID]:
-                x_c += coord_pair[0]
-                y_c += coord_pair[1]
+                x_c += coord_pair[1]
+                y_c += coord_pair[0]
                 count += 1
             x_c = x_c / count
             y_c = y_c / count

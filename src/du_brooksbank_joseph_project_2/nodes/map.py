@@ -1,3 +1,4 @@
+import math
 import numpy
 import random
 import nav_msgs.msg
@@ -136,16 +137,18 @@ class FrontierMap(Map):
 
 class ClusterMap(Map):
     """ Class for Cluster Maps; including generation of map and conversion to visual markers"""
+
     def __init__(self, map_data):
         # type: (FrontierMap) -> None
         assert isinstance(map_data, FrontierMap)
         self.center_points = []
+        self.mark_id = 1
 
         # Initially, map is all zeros
         Map.__init__(self, size=map_data)
 
         # Creating an array of frontier locations as [x,y] pairs for cluster algorithm
-        point_array = []
+        point_array = []  # type: [int,int]
         for i in range(self.width):
             for j in range(self.height):
                 if map_data.map_2d[i, j] != 0:
@@ -176,7 +179,7 @@ class ClusterMap(Map):
 
             self.map_2d[coords[0], coords[1]] = cur_value
 
-        # Saving center points of all clusters
+        # Saving center points of all clusters in map coordinates
         for clusterID in cluster_groups:
             x_c = y_c = count = 0
             for coord_pair in cluster_groups[clusterID]:
@@ -186,10 +189,11 @@ class ClusterMap(Map):
             x_c = x_c / count
             y_c = y_c / count
 
-            self.center_points.append([x_c, y_c])
+            xy = self.grid_to_map_coords([x_c, y_c])
+            self.center_points.append(xy)
 
-    def make_sphere_marker(self, x, y, radius, color, mark_id, off_x, off_y):
-        # type: (int, int, float, ColorRGBA, int, int, int) -> Marker
+    def make_sphere_marker(self, xy, radius, color):
+        # type: ([int,int], float, ColorRGBA) -> Marker
         """ Function to generate a spherical marker
 
             ARGUMENTS:
@@ -203,13 +207,14 @@ class ClusterMap(Map):
         marker.header.stamp = rospy.Time.now()
         marker.header.frame_id = 'map'
         marker.ns = 'frontier'
-        marker.id = mark_id
+        marker.id = self.mark_id
+        self.mark_id += 1
         marker.type = 2
         marker.action = 0
         marker.pose = geometry_msgs.msg.Pose()
         marker.pose.orientation.w = 1
-        marker.pose.position.x = self.resolution * x + off_x
-        marker.pose.position.y = self.resolution * y + off_y
+        marker.pose.position.x = xy[0]
+        marker.pose.position.y = xy[1]
         marker.scale = geometry_msgs.msg.Vector3(radius, radius, radius)
         marker.color = color
         marker.lifetime = rospy.rostime.Duration(0)
@@ -224,7 +229,7 @@ class ClusterMap(Map):
         markers = []
 
         # unique identifier for each sphere marker
-        mark_id = 1
+
         for i in range(self.width):
             for j in range(self.height):
                 cluster_value = self.map_2d[i, j]
@@ -237,14 +242,31 @@ class ClusterMap(Map):
                         colors[cluster_value] = temp_color
                         color = temp_color
 
-                    markers.append(self.make_sphere_marker(j, i, 0.1, color, mark_id,
-                                                           self.origin.position.x, self.origin.position.y))
-                    mark_id += 1
+                    xy = self.grid_to_map_coords([j, i])
+                    markers.append(self.make_sphere_marker(xy, 0.1, color))
 
         for center_point in self.center_points:
             markers.append(
-                self.make_sphere_marker(center_point[1], center_point[0], 0.3, ColorRGBA(1, 0, 0, 1), mark_id,
-                                        self.origin.position.x, self.origin.position.y))
-            mark_id += 1
+                self.make_sphere_marker(center_point, 0.3, ColorRGBA(1, 0, 0, 1)))
 
         return MarkerArray(markers)
+
+    def grid_to_map_coords(self, xy):
+        x = self.resolution * xy[0] + self.origin.position.x
+        y = self.resolution * xy[1] + self.origin.position.y
+        return [x, y]
+
+    def closest_centroid(self, robotXY):
+        # type: ([int,int]) -> [int,int]
+        lowest_distance = float('inf')
+        closest_centroid = None  # type: [int,int]
+        # if there are no centroids left, return none
+        if len(self.center_points) == 0:
+            return None
+        for xy in self.center_points:
+            dist = math.hypot(xy[0] - robotXY[0], xy[1] - robotXY[1])
+            if dist < lowest_distance:
+                lowest_distance = dist
+                closest_centroid = xy
+        rospy.loginfo("closest centroid is: " + str(closest_centroid[0]) + "," + str(closest_centroid[1]))
+        return closest_centroid

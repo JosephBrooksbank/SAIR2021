@@ -44,6 +44,12 @@ https://youtu.be/af0odgvD_jo
 
 ### PART 3 (CURRENT)
 
+# Sample video:
+https://www.youtube.com/watch?v=qlrvk6Haifk
+# The path the robot took in this example was different than how it usually runs-- It got 'stuck' in a corner for a bit.
+# That being said, eventually it found a way out which shows off how my timeout works-- You can see how fast it progresses from
+# point to point when the pathfinding doesn't get stuck wiggling.
+
 ## Notable changes:
 # Rewrote project using OOP. Much more readable and debuggable now. Enforces typing where possible, but python 2 doesn't
 # have great support for that. (Maybe its time to move to ROS Noetic?)

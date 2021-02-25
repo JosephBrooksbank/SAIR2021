@@ -103,7 +103,7 @@ class Project2:
                             self.try_goal(self.current_goal)
                             self.moving_to_goal = True
                             # If it tries to get to a goal for too long, try again
-                            self.give_up_timer = rospy.Timer(rospy.Duration(15), self.cancel_route)
+                            self.give_up_timer = rospy.Timer(rospy.Duration(15), self.cancel_route, oneshot=True)
 
                     except rospy.ROSInterruptException:
                         rospy.loginfo("Failed to make to goal, try again")
@@ -120,9 +120,10 @@ class Project2:
         # If already going to a goal, don't update map
         if data != self.current_raw_map:
             self.current_raw_map = data
-            frontier_map = FrontierMap(Map(data=self.current_raw_map))
+            orig_map =  Map(data=self.current_raw_map)
+            frontier_map = FrontierMap(orig_map)
             # both objects need to use the same drawing tools object, so that IDs are unique
-            self.cluster_map = ExploreMap(frontier_map, self.drawing_tools)
+            self.cluster_map = ExploreMap(orig_map, frontier_map, self.drawing_tools)
 
             # Clearing canvas
             delete_message = Marker()
@@ -134,8 +135,7 @@ class Project2:
             self.draw_current_goal()
             self.map_post.publish(frontier_map.to_occupancy_grid())
 
-    def cancel_route(self):
-        # type: () -> None
+    def cancel_route(self, data=None):
         """ Cancels current pathfinder route and resets timer"""
         rospy.loginfo("Cancelling Route, trying again...")
         self.give_up_timer.shutdown()

@@ -149,14 +149,15 @@ class ExploreMap(Map):
     # through experimentation, this was the best way to cluster
     NUM_CLUSTERS = 4
 
-    def __init__(self, map_data, drawing_tools):
-        # type: (FrontierMap, DrawingTools) -> None
+    def __init__(self, orig_map_data, map_data, drawing_tools):
+        # type: (Map, FrontierMap, DrawingTools) -> None
         assert isinstance(map_data, FrontierMap)
-
+        assert isinstance(orig_map_data, Map)
         self.center_points = []
         self.current_goal = None
         self.mark_id = 1
         self.drawing_tools = drawing_tools
+        self.orig_map = orig_map_data
 
         # Initially, map is all zeros
         Map.__init__(self, size=map_data)
@@ -205,7 +206,7 @@ class ExploreMap(Map):
                 y_c = y_c / count
 
                 xy = self.grid_to_map_coords([x_c, y_c])
-                self.center_points.append(xy)
+                self.center_points.append([x_c, y_c])
         except ValueError:
             pass
 
@@ -232,8 +233,10 @@ class ExploreMap(Map):
                     markers.append(self.drawing_tools.make_sphere_marker(xy, 0.1, color, "clusterMap"))
 
         for center_point in self.center_points:
+            xy = self.grid_to_map_coords(center_point)
             markers.append(
-                self.drawing_tools.make_sphere_marker(center_point, 0.3, ColorRGBA(1, 0, 0, 1), "centroids"))
+
+                self.drawing_tools.make_sphere_marker(xy, 0.3, ColorRGBA(1, 0, 0, 1), "centroids"))
 
         return MarkerArray(markers)
 
@@ -244,6 +247,7 @@ class ExploreMap(Map):
         y = self.resolution * xy[1] + self.origin.position.y
         return [x, y]
 
+
     def closest_centroid(self, robotXY):
         # type: ([int,int]) -> [int,int]
         """ Finds the centroid closest to the coordinates given """
@@ -252,8 +256,14 @@ class ExploreMap(Map):
         if len(self.center_points) == 0:
             return None
         for xy in self.center_points:
-            dist = math.hypot(xy[0] - robotXY[0], xy[1] - robotXY[1])
+            # if in a wall, use a different centroid
+            # if self.orig_map.map_2d[xy[0], xy[1]] == 100:
+            #     rospy.loginfo("skipping point in wall")
+            #     continue
+            convert_xy = self.grid_to_map_coords(xy)
+            dist = math.hypot(convert_xy[0] - robotXY[0], convert_xy[1] - robotXY[1])
             if dist < lowest_distance:
                 lowest_distance = dist
-                self.current_goal = xy
+                self.current_goal = convert_xy
+
         return self.current_goal

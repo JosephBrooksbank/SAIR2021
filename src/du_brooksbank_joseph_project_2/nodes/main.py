@@ -1,27 +1,43 @@
 #!/usr/bin/env python
+import math
+
 import rospy
 import actionlib
 import tf2_ros
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import geometry_msgs.msg
 import nav_msgs.msg
+from std_msgs.msg import ColorRGBA
+
+from drawing_tools import DrawingTools
 
 from visualization_msgs.msg import MarkerArray, Marker
 
-from map import Map, FrontierMap, ClusterMap
+from map import Map, FrontierMap, ExploreMap
 
 
 class Project2:
     """ Class for running project 2"""
 
+    TOLERANCE = 0.5
+
     def __init__(self):
 
         rospy.init_node('project_2', anonymous=True)
 
+        self.drawing_tools = DrawingTools()
         # Latest information from Map Topic
         self.current_raw_map = []
         # State of exploration
-        self.finished = False
+        self.current_goal = None
+        # why even have namespaces for markers if we can't do selections based off of them ._.
+        self.current_goal_id = None
+
+        self.moving_to_goal = False
+
+        self.give_up_timer = None
+
+        self.cluster_map = None
 
         # Publishing bot position
         self.tfBuffer = tf2_ros.Buffer()
@@ -64,13 +80,52 @@ class Project2:
             self.pos_post.publish(self.trans)
             self.rate.sleep()
 
+            xy = [
+                self.trans.transform.translation.x,
+                self.trans.transform.translation.y
+            ]
+
+            if not self.moving_to_goal:
+                if not self.cluster_map:
+                    continue
+                else:
+                    try:
+
+                        # x = 1
+                        # y = -1
+                        self.current_goal = self.cluster_map.closest_centroid(xy)
+                        if not self.current_goal:
+                            # Clear markers
+                            delete_message = Marker()
+                            delete_message.action = 3  # Action 3: Delete All
+                            self.marker_post.publish([delete_message])
+                            # Stop process
+                            rospy.signal_shutdown("Finished exploring")
+                        else:
+                            self.draw_current_goal()
+
+                            self.try_goal(self.current_goal)
+                            self.moving_to_goal = True
+                            self.give_up_timer = rospy.Timer(rospy.Duration(15), self.cancel_route)
+
+                    except rospy.ROSInterruptException:
+                        rospy.loginfo("Failed to make to goal, try again")
+            else:
+                dist = math.hypot(xy[0] - self.current_goal[0], xy[1] - self.current_goal[1])
+                rospy.loginfo("distance to goal: " + str(dist))
+                if dist < Project2.TOLERANCE or self.move_client.get_result():
+                    self.cancel_route()
+
     def map_to_frontier_map_callback(self, data):
         """ Callback to convert /map topic info into frontier exploration data """
+
+        # If already going to a goal, don't update map
 
         if data != self.current_raw_map:
             self.current_raw_map = data
             frontier_map = FrontierMap(Map(data=self.current_raw_map))
-            cluster_map = ClusterMap(frontier_map)
+            # both objects need to use the same drawing tools object, so that IDs are unique
+            self.cluster_map = ExploreMap(frontier_map, self.drawing_tools)
 
             # Clearing canvas
             delete_message = Marker()
@@ -78,49 +133,38 @@ class Project2:
             self.marker_post.publish([delete_message])
 
             # Publishing data
+            self.marker_post.publish(self.cluster_map.to_markers())
+            self.draw_current_goal()
             self.map_post.publish(frontier_map.to_occupancy_grid())
-            self.marker_post.publish(cluster_map.to_markers())
 
-            if not self.finished and self.trans is not None:
-                try:
-                    xy = [
-                        self.trans.transform.translation.x,
-                        self.trans.transform.translation.y
-                    ]
-                    result = self.try_goal(cluster_map.closest_centroid(xy))
-                    if result:
-                        rospy.loginfo("Made it to centroid, computing new goal...")
-                    else:
-                        rospy.loginfo("No more centroids, finished!")
-                except rospy.ROSInterruptException:
-                    rospy.loginfo("Failed to make to goal, try again")
+    def cancel_route(self):
+        rospy.loginfo("Cancelling Route, trying again...")
+        self.give_up_timer.shutdown()
+        self.move_client.cancel_all_goals()
+        self.moving_to_goal = False
 
-    @staticmethod
-    def generate_goal(xy):
-        """ Generate a goal position and orientation inside a MoveBaseGoal() Object """
+    def draw_current_goal(self):
+        if not self.current_goal:
+            return
+        # This is where I would delete based on namespace, if I could :)
+        if self.current_goal_id:
+            delete_message = Marker()
+            delete_message.action = 2  # Action 2: Delete One
+            delete_message.id = self.current_goal_id
+            self.marker_post.publish([delete_message])
+        marker = self.drawing_tools.make_sphere_marker(self.current_goal, 0.35, ColorRGBA(0, 1, 0, 1), "currentGoal")
+        self.current_goal_id = marker.id
+
+        self.marker_post.publish(MarkerArray([marker]))
+
+    def try_goal(self, xy):
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose.position.x = xy[0]
         goal.target_pose.pose.position.y = xy[1]
-        # goal.target_pose.pose.orientation.w = w
-        return goal
-
-    def try_goal(self, xy):
-
-        goal = Project2.generate_goal(xy)
-        if goal is None:
-            self.finished = True
-            return None
-
+        goal.target_pose.pose.orientation.w = 1.0
         self.move_client.send_goal(goal)
-        wait = self.move_client.wait_for_result()
-        if not wait:
-            rospy.loginfo("Move failed")
-        else:
-            ret = self.move_client.get_result()
-            if ret:
-                return True
 
 
 if __name__ == '__main__':

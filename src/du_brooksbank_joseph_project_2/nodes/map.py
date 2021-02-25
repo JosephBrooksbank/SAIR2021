@@ -4,14 +4,15 @@ import random
 import nav_msgs.msg
 import rospy
 from sklearn.cluster import AgglomerativeClustering
-import geometry_msgs.msg
+
+from drawing_tools import DrawingTools
 from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import ColorRGBA
 
 
 class Map:
     """ Base Map Class"""
-    ROBOT_WIDTH = 5
+    ROBOT_WIDTH = 4
 
     def __init__(self, **kwargs):
 
@@ -135,14 +136,16 @@ class FrontierMap(Map):
         return occupy_grid
 
 
-class ClusterMap(Map):
+class ExploreMap(Map):
     """ Class for Cluster Maps; including generation of map and conversion to visual markers"""
 
-    def __init__(self, map_data):
-        # type: (FrontierMap) -> None
+    def __init__(self, map_data, drawing_tools):
+        # type: (FrontierMap, DrawingTools) -> None
         assert isinstance(map_data, FrontierMap)
         self.center_points = []
+        self.current_goal = None
         self.mark_id = 1
+        self.drawing_tools = drawing_tools
 
         # Initially, map is all zeros
         Map.__init__(self, size=map_data)
@@ -154,72 +157,48 @@ class ClusterMap(Map):
                 if map_data.map_2d[i, j] != 0:
                     point_array.append([i, j])
 
-        # through experimentation, this was the best way to cluster
-        cluster_values = AgglomerativeClustering(n_clusters=4, ).fit_predict(point_array)
-        cluster_groups = {}
+            # through experimentation, this was the best way to cluster
 
-        # There is a cluster labeled "0" by default, which is also my empty space. This caused
-        # issues for an embarrassingly long time.
-        for i in range(len(cluster_values)):
-            cluster_values[i] += 1
+        try:
 
-        # Re building a map with the index of the cluster as the value at that position
-        for i in range(len(point_array)):
-            cur_value = cluster_values[i]
+            cluster_values = AgglomerativeClustering(n_clusters=4, ).fit_predict(point_array)
+            cluster_groups = {}
 
-            # the clustering algorithm maintains order of the array, so I can get which coordinates
-            # the cluster index was originally part of
-            coords = point_array[i]
+            # There is a cluster labeled "0" by default, which is also my empty space. This caused
+            # issues for an embarrassingly long time.
+            for i in range(len(cluster_values)):
+                cluster_values[i] += 1
 
-            # Sorting into groups based on cluster index, for centroid creation
-            if cur_value not in cluster_groups:
-                cluster_groups[cur_value] = [coords]
-            else:
-                cluster_groups[cur_value].append(coords)
+            # Re building a map with the index of the cluster as the value at that position
+            for i in range(len(point_array)):
+                cur_value = cluster_values[i]
 
-            self.map_2d[coords[0], coords[1]] = cur_value
+                # the clustering algorithm maintains order of the array, so I can get which coordinates
+                # the cluster index was originally part of
+                coords = point_array[i]
 
-        # Saving center points of all clusters in map coordinates
-        for clusterID in cluster_groups:
-            x_c = y_c = count = 0
-            for coord_pair in cluster_groups[clusterID]:
-                x_c += coord_pair[1]
-                y_c += coord_pair[0]
-                count += 1
-            x_c = x_c / count
-            y_c = y_c / count
+                # Sorting into groups based on cluster index, for centroid creation
+                if cur_value not in cluster_groups:
+                    cluster_groups[cur_value] = [coords]
+                else:
+                    cluster_groups[cur_value].append(coords)
 
-            xy = self.grid_to_map_coords([x_c, y_c])
-            self.center_points.append(xy)
+                self.map_2d[coords[0], coords[1]] = cur_value
 
-    def make_sphere_marker(self, xy, radius, color):
-        # type: ([int,int], float, ColorRGBA) -> Marker
-        """ Function to generate a spherical marker
+            # Saving center points of all clusters in map coordinates
+            for clusterID in cluster_groups:
+                x_c = y_c = count = 0
+                for coord_pair in cluster_groups[clusterID]:
+                    x_c += coord_pair[1]
+                    y_c += coord_pair[0]
+                    count += 1
+                x_c = x_c / count
+                y_c = y_c / count
 
-            ARGUMENTS:
-                x, y: coordinates of point in grid space
-                radius: float
-                color: ColorRGBA
-                mark_id: unique id
-                off_x, off_y: Origin of map coordinates in world frame """
-        marker = Marker()
-
-        marker.header.stamp = rospy.Time.now()
-        marker.header.frame_id = 'map'
-        marker.ns = 'frontier'
-        marker.id = self.mark_id
-        self.mark_id += 1
-        marker.type = 2
-        marker.action = 0
-        marker.pose = geometry_msgs.msg.Pose()
-        marker.pose.orientation.w = 1
-        marker.pose.position.x = xy[0]
-        marker.pose.position.y = xy[1]
-        marker.scale = geometry_msgs.msg.Vector3(radius, radius, radius)
-        marker.color = color
-        marker.lifetime = rospy.rostime.Duration(0)
-        marker.frame_locked = True
-        return marker
+                xy = self.grid_to_map_coords([x_c, y_c])
+                self.center_points.append(xy)
+        except ValueError:
+            pass
 
     def to_markers(self):
         # type: () -> MarkerArray
@@ -243,11 +222,11 @@ class ClusterMap(Map):
                         color = temp_color
 
                     xy = self.grid_to_map_coords([j, i])
-                    markers.append(self.make_sphere_marker(xy, 0.1, color))
+                    markers.append(self.drawing_tools.make_sphere_marker(xy, 0.1, color, "clusterMap"))
 
         for center_point in self.center_points:
             markers.append(
-                self.make_sphere_marker(center_point, 0.3, ColorRGBA(1, 0, 0, 1)))
+                self.drawing_tools.make_sphere_marker(center_point, 0.3, ColorRGBA(1, 0, 0, 1), "centroids"))
 
         return MarkerArray(markers)
 
@@ -259,7 +238,6 @@ class ClusterMap(Map):
     def closest_centroid(self, robotXY):
         # type: ([int,int]) -> [int,int]
         lowest_distance = float('inf')
-        closest_centroid = None  # type: [int,int]
         # if there are no centroids left, return none
         if len(self.center_points) == 0:
             return None
@@ -267,6 +245,6 @@ class ClusterMap(Map):
             dist = math.hypot(xy[0] - robotXY[0], xy[1] - robotXY[1])
             if dist < lowest_distance:
                 lowest_distance = dist
-                closest_centroid = xy
-        rospy.loginfo("closest centroid is: " + str(closest_centroid[0]) + "," + str(closest_centroid[1]))
-        return closest_centroid
+                self.current_goal = xy
+        rospy.loginfo("closest centroid is: " + str(self.current_goal[0]) + "," + str(self.current_goal[1]))
+        return self.current_goal

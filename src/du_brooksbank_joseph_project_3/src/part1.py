@@ -62,6 +62,10 @@ class Part1:
         right_front_val = get_range(-60, -30)
         front_val = get_range(-30, 30)
         self.state_manager.get_readings(right_val, right_front_val, front_val)
+        # rospy.loginfo(str(right_val) + " " + str(right_front_val) + " " + str(front_val))
+        # rospy.loginfo(self.state_manager.right_state.current_state + " " + self.state_manager.right_front_state.current_state\
+        #               + " " + self.state_manager.front_state.current_state)
+        self.q_table.current_state = self.state_manager.get_state_index()
 
     def __init__(self):
         rospy.init_node('project_3', anonymous=True)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import math
 from math import radians
 import rospy
 from enum import Enum
@@ -7,25 +8,11 @@ from gazebo_msgs.srv import SetModelState
 from gazebo_msgs.msg import ModelState, ModelStates
 import numpy as np
 from geometry_msgs.msg import Twist
+from tf.transformations import euler_from_quaternion
 
-
-class Actions(Enum):
-    FORWARD = 0
-    TURN_RIGHT = 1
-    TURN_LEFT = 2
-    FINISHED = 3
-
-
-class States(Enum):
-    # SIDE_FRONT states
-    CLOSE_CLOSE = 0
-    CLOSE_FAR = 1
-    GOOD_CLOSE = 2
-    GOOD_FAR = 3
-    FAR_CLOSE = 4
-    FAR_FAR = 5
-    # Will have to remove this state and handle it some other way when learning
-    UNKNOWN = -1
+from Actions import Actions
+from Q_Table import QTable
+from State import StateManager
 
 
 class Distances(Enum):
@@ -37,125 +24,82 @@ class Distances(Enum):
 
 class DistanceBreaks(Enum):
     # The distance at which 'close' turns into 'good'
-    CLOSE_GOOD = 0.3
+    CLOSE_GOOD = 0.35
     # The distance at which 'good' turns into 'far'
     GOOD_FAR = 0.5
 
 
+def distance_2_points(point1, point2):
+    return math.hypot(point2[0] - point1[0], point2[1] - point1[1])
+
+
 class Part1:
-
-    currentState = States.UNKNOWN
-
-    def call_command(self, r, x=0.2, a=0.0):
-        command = Twist()
-        command.linear.x = x
-        command.angular.z = a
-        for i in range(0, r):
-            self.move_robot.publish(command)
-            self.r.sleep()
-
-    def forward(self):
-        self.call_command(5)
-
-    def turn_right(self):
-        self.call_command(5, 0, radians(-20))
-        self.call_command(5)
-
-    def turn_left(self):
-        self.call_command(5, 0, radians(20))
-        self.call_command(5)
-
-    def finished(self):
-        pass
 
     def wait_for_models(self, data):
         # type: (ModelStates) -> None
         if len(data.name) >= 3:
             self.spawned = True
+            for i in range(len(data.name)):
+                if data.name[i] == 'turtlebot3_burger':
+                    self.pose = data.pose[i]
 
     def laser_callback(self, data):
         # type: (LaserScan) -> None
         """Converts raw laser data into a current state"""
-        scan_radius = 2
+        scan_radius = 15
 
-        def get_range(mid):
-            lower_edge = mid - scan_radius
-            upper_edge = mid + scan_radius
+        def get_range(lower, upper):
+
             end_val = 0
-            for i in range(lower_edge, upper_edge):
+            for i in range(lower, upper):
                 end_val += data.ranges[i]
-            end_val = end_val / (upper_edge - lower_edge)
-            # Farther than readable data is still in far
-            if end_val == "inf":
-                end_val = DistanceBreaks.GOOD_FAR.value + 1
-            if end_val < DistanceBreaks.CLOSE_GOOD.value:
-                return Distances.CLOSE
-            elif DistanceBreaks.CLOSE_GOOD.value < end_val < DistanceBreaks.GOOD_FAR.value:
-                return Distances.GOOD
-            elif end_val > DistanceBreaks.GOOD_FAR.value:
-                return Distances.FAR
-            else:
-                return Distances.UNKNOWN
+            end_val = end_val / (upper - lower)
+
+            return end_val
 
         # These magic numbers specify the degree at which to sample the laser scan, with 0 as the front of the robot
-        right_val = get_range(270)
-        front_val = get_range(0)
-        if right_val == Distances.UNKNOWN or front_val == Distances.UNKNOWN:
-            return None
-        if front_val == Distances.GOOD:
-            front_val = Distances.FAR
-
-        if right_val == Distances.CLOSE:
-            if front_val == Distances.CLOSE:
-                self.currentState = States.CLOSE_CLOSE
-            elif front_val == Distances.FAR:
-                self.currentState = States.CLOSE_FAR
-        elif right_val == Distances.GOOD:
-            if front_val == Distances.CLOSE:
-                self.currentState = States.GOOD_CLOSE
-            elif front_val == Distances.FAR:
-                self.currentState = States.GOOD_FAR
-        elif right_val == Distances.FAR:
-            if front_val == Distances.CLOSE:
-                self.currentState = States.FAR_CLOSE
-            elif front_val == Distances.FAR:
-                self.currentState = States.FAR_FAR
+        right_val = get_range(-90, -30)
+        right_front_val = get_range(-60, -30)
+        front_val = get_range(-30, 30)
+        self.state_manager.get_readings(right_val, right_front_val, front_val)
 
     def __init__(self):
-        self.spawned = False
-        self.q_table = np.zeros((len(Actions), len(States)))
-        # Setting an action for each state
-        self.q_table[Actions.FORWARD.value][States.GOOD_FAR.value] = 100
-        # This is a corner, for part 2
-        self.q_table[Actions.FINISHED.value][States.GOOD_CLOSE.value] = 100
-        self.q_table[Actions.TURN_RIGHT.value][States.FAR_FAR.value] = 100
-        self.q_table[Actions.TURN_LEFT.value][States.FAR_CLOSE.value] = 100
-        self.q_table[Actions.TURN_LEFT.value][States.CLOSE_FAR.value] = 100
-        # This is also a corner
-        self.q_table[Actions.FINISHED.value][States.CLOSE_CLOSE.value] = 100
-
-        self.action_list = {Actions.FORWARD: self.forward,
-                            Actions.TURN_RIGHT: self.turn_right,
-                            Actions.TURN_LEFT: self.turn_left,
-                            Actions.FINISHED: self.finished
-                            }
-
         rospy.init_node('project_3', anonymous=True)
-        self.r = rospy.Rate(10)
-        self.move_robot = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.state_manager = StateManager()
+
+        self.pose = None
+        self.spawned = False
+        self.actions = Actions()
+        self.q_table = QTable()
+        self.stuck_count = 0
+        self.max_stuck = 5
+        self.prev_pose = None
+        # Setting an action for each state
+
         rospy.Subscriber("/scan", LaserScan, self.laser_callback)
         rospy.Subscriber("/gazebo/model_states", ModelStates, self.wait_for_models)
         rospy.wait_for_service('/gazebo/set_model_state')
+        rospy.wait_for_service('/gazebo/get_model_state')
         self.move_model = rospy.ServiceProxy('/gazebo/set_model_state', SetModelState)
 
-    def main(self):
+    def get_pose(self):
+        return [self.pose.position.x, self.pose.position.y]
+
+    def reset(self):
+        # Throw away any unsaved changed to Q table
+        self.q_table.load_table()
         init_state = ModelState()
         init_state.model_name = 'turtlebot3_burger'
         init_state.pose.position.x = 0.8
         init_state.pose.position.y = 2.0
-        init_state.pose.position.z = 1.0
+        init_state.pose.position.z = 0.1
         init_state.pose.orientation.z = 6.15
         init_state.reference_frame = 'map'
+
+        init_velocity = Twist()
+        init_velocity.linear.x = init_velocity.linear.y = init_velocity.linear.z = 0
+        init_velocity.angular.z = init_velocity.angular.x = init_velocity.angular.y = 0
+        init_state.twist = init_velocity
 
         moved = False
 
@@ -168,20 +112,28 @@ class Part1:
             except:
                 continue
 
-        temp = Twist()
-        temp.linear.x = 10
-        self.move_robot.publish(temp)
+    def main(self):
+        self.reset()
+        self.prev_pose = self.get_pose()
 
+        num_iterations = 10
+        count = 0
         while not rospy.is_shutdown():
-            possible_actions = self.q_table[:, self.currentState.value]
-            reward = -100
-            next_action = -1
-            for i in range(len(possible_actions)):
-                if possible_actions[i] > reward:
-                    next_action = Actions(i)
-                    reward = self.q_table[i, self.currentState.value]
-            rospy.loginfo("%s, %s", self.currentState, next_action)
-            self.action_list[next_action]()
+            while count < num_iterations:
+                self.q_table.next_action()
+                count += 1
+                if distance_2_points(self.get_pose(), self.prev_pose) < 0.05:
+                    rospy.loginfo("Stuck!")
+                    self.stuck_count += 1
+                if self.stuck_count >= self.max_stuck:
+                    rospy.loginfo("Stuck for too long! resetting...")
+                    self.reset()
+                    self.stuck_count = 0
+                    count = 0
+                self.prev_pose = self.get_pose()
+
+            count = 0
+            self.q_table.save_table()
 
 
 if __name__ == '__main__':

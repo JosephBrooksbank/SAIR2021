@@ -738,6 +738,12 @@ du_brooksbank_joseph_project_2_BINARY_DIR:STATIC=/home/jbrooksbank/catkin_ws/bui
 du_brooksbank_joseph_project_2_SOURCE_DIR:STATIC=/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_2
 
 //Value Computed by CMake
+du_brooksbank_joseph_project_3_BINARY_DIR:STATIC=/home/jbrooksbank/catkin_ws/build/du_brooksbank_joseph_project_3
+
+//Value Computed by CMake
+du_brooksbank_joseph_project_3_SOURCE_DIR:STATIC=/home/jbrooksbank/catkin_ws/src/du_brooksbank_joseph_project_3
+
+//Value Computed by CMake
 du_joseph_brooksbank_project_2_BINARY_DIR:STATIC=/home/jbrooksbank/catkin_ws/build/du_brooksbank_joseph_project_2
 
 //Value Computed by CMake
@@ -1305,7 +1311,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=9
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=10
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP

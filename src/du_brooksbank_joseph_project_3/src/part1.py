@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import math
+import sys
 from math import radians
 import rospy
 from enum import Enum
@@ -13,20 +14,6 @@ from tf.transformations import euler_from_quaternion
 from Actions import Actions
 from Q_Table import QTable
 from State import StateManager
-
-
-class Distances(Enum):
-    CLOSE = 0
-    GOOD = 1
-    FAR = 2
-    UNKNOWN = -1
-
-
-class DistanceBreaks(Enum):
-    # The distance at which 'close' turns into 'good'
-    CLOSE_GOOD = 0.35
-    # The distance at which 'good' turns into 'far'
-    GOOD_FAR = 0.5
 
 
 def distance_2_points(point1, point2):
@@ -50,15 +37,16 @@ class Part1:
 
         def get_range(lower, upper):
 
-            end_val = 0
+            end_val = sys.maxint
             for i in range(lower, upper):
-                end_val += data.ranges[i]
-            end_val = end_val / (upper - lower)
+                if data.ranges[i] < end_val:
+                    end_val = data.ranges[i]
+            # end_val = end_val / (upper - lower)
 
             return end_val
 
         # These magic numbers specify the degree at which to sample the laser scan, with 0 as the front of the robot
-        right_val = get_range(-90, -30)
+        right_val = get_range(-120, -60)
         right_front_val = get_range(-60, -30)
         front_val = get_range(-30, 30)
         self.state_manager.get_readings(right_val, right_front_val, front_val)
@@ -74,9 +62,9 @@ class Part1:
         self.pose = None
         self.spawned = False
         self.actions = Actions()
-        self.q_table = QTable()
+        self.q_table = QTable(self.state_manager)
         self.stuck_count = 0
-        self.max_stuck = 5
+        self.max_stuck = 40
         self.prev_pose = None
         # Setting an action for each state
 
@@ -89,12 +77,13 @@ class Part1:
     def get_pose(self):
         return [self.pose.position.x, self.pose.position.y]
 
+    # TODO add multiple respawn points
     def reset(self):
         # Throw away any unsaved changed to Q table
-        self.q_table.load_table()
+        # self.q_table.load_table()
         init_state = ModelState()
         init_state.model_name = 'turtlebot3_burger'
-        init_state.pose.position.x = 0.8
+        init_state.pose.position.x = 0.0
         init_state.pose.position.y = 2.0
         init_state.pose.position.z = 0.1
         init_state.pose.orientation.z = 6.15
@@ -122,18 +111,21 @@ class Part1:
 
         num_iterations = 10
         count = 0
+        total_count = 0
         while not rospy.is_shutdown():
             while count < num_iterations:
                 self.q_table.next_action()
                 count += 1
-                if distance_2_points(self.get_pose(), self.prev_pose) < 0.05:
+                total_count += 1
+                if distance_2_points(self.get_pose(), self.prev_pose) < 0.01:
                     rospy.loginfo("Stuck!")
                     self.stuck_count += 1
-                if self.stuck_count >= self.max_stuck:
+                if self.stuck_count >= self.max_stuck or total_count > 1000:
                     rospy.loginfo("Stuck for too long! resetting...")
                     self.reset()
                     self.stuck_count = 0
                     count = 0
+                    total_count = 0
                 self.prev_pose = self.get_pose()
 
             count = 0

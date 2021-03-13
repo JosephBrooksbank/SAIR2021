@@ -6,28 +6,27 @@ import random
 import rospy
 
 from Actions import Actions
-from State import State, StateManager
+from State import StateManager
 
 
 class QTable:
 
-    # Current state is updated in a callback in the main class (gross) # TODO Can I change this
-    current_state = -1
+    current_state = 0
 
     rewards = {}
     gamma = 0.8
     epsilon = 0.9
+    alpha = 0.8
     dir_path = os.path.dirname(os.path.realpath(__file__))
     txt_file = dir_path + "/q_table.csv"
 
-    # TODO find a better way to get this value in this class
-    NUM_STATES = 125
-
-    def __init__(self):
-        self.state_manager = StateManager()
+    def __init__(self, state_manager):
+        # type: (StateManager) -> None
         self.actions = Actions()
         self.q_table = np.zeros((self.NUM_STATES, len(self.actions)))
         self.load_table()
+        self.state_manager = state_manager
+        self.NUM_STATES = self.state_manager.NUM_STATES
 
         for val in range(0, self.NUM_STATES):
             self.rewards[val] = 0
@@ -38,11 +37,17 @@ class QTable:
         for rightVal in self.state_manager.right_state.distances:
             for rightFrontVal in self.state_manager.right_front_state.distances:
                 for frontVal in self.state_manager.front_state.distances:
-                    if rightVal == "too_close" or rightVal == "too_far" or frontVal == "too_close":
+                    if rightVal == "too_close" or rightVal == "too_far" or frontVal == "too_close"\
+                            or rightFrontVal == "too_far":
                         self.rewards[self.state_manager.generate_state_index(rightVal, rightFrontVal, frontVal)] = -1
+
+    def update_state(self, state):
+        # type: (int) -> None
+        self.current_state = state
 
     def next_action(self):
         state_for_action = self.current_state
+
         # Grabbing the column of actions available for the current state
         possible_actions = self.q_table[state_for_action, :]
         reward = -100
@@ -56,14 +61,21 @@ class QTable:
                     reward = possible_actions[i]
         else:
             rospy.loginfo("Took random action!")
-            next_action = random.randint(0, len(possible_actions)-1)
+            next_action = random.randint(0, len(possible_actions) - 1)
+        rospy.loginfo("Now doing: " + str(next_action))
         self.actions.action_list[next_action]()
         new_state = self.current_state
+        # rospy.loginfo(str(new_state) + " " + str(self.rewards[new_state]))
         if self.rewards[new_state] == 100:
             rospy.loginfo("In Goal State!")
-        self.q_table[state_for_action, next_action] = self.rewards[new_state] + self.calculate_reward(new_state)
+        # self.q_table[state_for_action, next_action] = self.rewards[new_state] + self.calculate_reward(new_state)
+        self.q_table[state_for_action, next_action] = self.q_table[state_for_action, next_action] \
+                                                      + self.alpha * \
+                                                      (self.rewards[new_state] + self.calculate_reward(new_state) - \
+                                                       self.q_table[state_for_action, next_action])
 
     def calculate_reward(self, state):
+        # type: (int) -> int
         max_reward = -1
         possible_actions = self.q_table[state, :]
         for i in range(len(possible_actions)):
@@ -82,5 +94,3 @@ class QTable:
         else:
             # Q table is all zeros at the beginning
             self.q_table = np.zeros((self.NUM_STATES, len(self.actions)))
-
-

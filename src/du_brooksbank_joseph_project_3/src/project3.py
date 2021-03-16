@@ -69,7 +69,7 @@ class Part1:
         rospy.loginfo(temp)
         # rospy.loginfo(self.state_manager.right_state.current_state + " " + self.state_manager.right_front_state.current_state\
         #               + " " + self.state_manager.front_state.current_state)
-        self.q_table.current_state = self.state_manager.get_state_index()
+        self.q_table.update_state(self.state_manager.get_state_index())
 
     def __init__(self):
         rospy.init_node('project_3', anonymous=True)
@@ -80,12 +80,12 @@ class Part1:
         self.actions = Actions()
         self.q_table = QTable(self.state_manager)
         self.stuck_count = 0
-        self.max_stuck = 10
+        self.max_stuck = 5
         self.prev_pose = None
         self.poses = []
         self.poses.append(add_pose(0.0, 2.0, 6.15))
-        self.poses.append(add_pose(-2.0, -1.0, 0.0))
-        self.poses.append(add_pose(-1.8, -1.8, 6.15))
+        # self.poses.append(add_pose(-2.0, -1.0, radians(180)))
+        self.poses.append(add_pose(-1.8, -1.8, 0.0))
         # Setting an action for each state
 
         rospy.Subscriber("/scan", LaserScan, self.laser_callback)

@@ -38,16 +38,16 @@ class Actions:
             self.r.sleep()
 
     def forward(self):
-        self.call_command(10, 0.5)
+        self.call_command(10, 0.4)
 
     def turn_right(self):
-        self.call_command(10, 0.5, radians(-50))
+        self.call_command(10, 0.4, radians(-25))
 
     def turn_left(self):
-        self.call_command(10, 0.5, radians(50))
+        self.call_command(10, 0.4, radians(25))
 
     def sharp_right(self):
-        self.call_command(20, 0.1, radians(-75))
+        self.call_command(20, 0.4, radians(-80))
 
     def sharp_left(self):
-        self.call_command(20, 0.1, radians(75))
+        self.call_command(20, 0.4, radians(80))

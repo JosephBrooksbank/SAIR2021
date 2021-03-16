@@ -1,4 +1,4 @@
-# Project 3 Part 1
+# Project 3
 
 ## Installation:
 ***
@@ -13,9 +13,16 @@
 2. In a terminal sourced as above, run `roslaunch du_brooksbank_joseph_project_3 wallfollow.launch`
 
 ## Example Video:
+Part 1:
 https://youtu.be/WtvcA_01e28
 
+**Part 2:**
+https://youtu.be/A8SN8WBLvF8
 
+
+
+
+ ## PART 1
 ## Discretization
 I chose to create essentially 3 ACTIONS and 6 STATES for my q_table. The actions being: FORWARD, TURN_LEFT, and TURN_RIGHT.
 The turning actions are not strictly turning but turning and moving forward slightly, so the robot can 'see' the effects of the turn
@@ -33,3 +40,56 @@ when placing the robot. I think the ground isn't perfectly flat, and they would 
 I believe I may either need to adjust the turning functions for part 2, or add actions to handle faster turns.
 I am using python's `Enum` class here, which I discovered is fairly useless. I plan on creating a class for Actions and
 their functionality for part 2, as well as a class for the Q_table.
+
+
+## PART 2:
+## Changes to structure
+In part 1, I had 3 actions and 6 states, for very simple navigation along a wall. This was all done essentially in
+one class, hard coded in. This was not sufficient for part 2. Currently, The robot has: 2 states for left, 5 states for 
+front, 2 states for right-front corner, and 5 states for right-- Giving a total of 100 states for the robot overall. Additionally
+the robot now has not only TURN_LEFT, TURN_RIGHT, and STRAIGHT, but a further discretization of turning for SLIGHT_LEFT
+and SLIGHT_RIGHT. Both Actions and States are now handled in their own OOP style classes, in a way that I am quite happy with. 
+This allows creation of more states and actions, as well as editing of current states and actions very easily. 
+
+### Notes: Tuesday, March 15
+This is my first submission of the project. The robot has not learned very well, especially on this first map. Over this
+week I expect much more progress can be made on the new, simpler map. A lot of my issues came from the robot sensing 
+the inner walls, I believe. Other changes I plan on making are tweaks to the linear and angular velocities of the actions,
+and making the epsilon value scale with total runs.
+
+Here is a video of progress so far: https://youtu.be/A8SN8WBLvF8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

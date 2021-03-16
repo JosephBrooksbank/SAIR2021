@@ -22,6 +22,7 @@ class QTable:
 
     def __init__(self, state_manager):
         # type: (StateManager) -> None
+        self.changed = False
 
         self.state_manager = state_manager
         self.NUM_STATES = self.state_manager.NUM_STATES
@@ -46,6 +47,7 @@ class QTable:
     def update_state(self, state):
         # type: (int) -> None
         self.current_state = state
+        self.changed = True
 
     def next_action(self):
         state_for_action = self.current_state
@@ -64,7 +66,7 @@ class QTable:
         else:
             next_action = random.randint(0, len(possible_actions) - 1)
         self.actions.action_list[next_action]()
-        new_state = self.current_state
+        new_state = self.wait_for_state()
         # rospy.loginfo(str(new_state) + " " + str(self.rewards[new_state]))
         if self.rewards[new_state] == 0:
             rospy.loginfo("In Goal State!")
@@ -75,6 +77,13 @@ class QTable:
                  self.calculate_max_action(new_state) - \
                  self.q_table[state_for_action, next_action])
         self.q_table[state_for_action, next_action] = new_q
+
+    def wait_for_state(self):
+        self.changed = False
+        while not self.changed:
+            pass
+        return self.current_state
+
 
     def calculate_max_action(self, state):
         # type: (int) -> int

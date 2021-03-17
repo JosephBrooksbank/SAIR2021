@@ -59,14 +59,14 @@ class Part1:
         # These magic numbers specify the degree at which to sample the laser scan, with 0 as the front of the robot
         right_val = get_range(260, 280)
         right_front_val = get_range(315, 330)
-        front_val = get_range(-30, 30)
+        front_val = get_range(-15, 15)
         left_val = get_range(80, 100)
         self.state_manager.get_readings(right_val, right_front_val, front_val, left_val)
         # rospy.loginfo(str(right_val) + " " + str(right_front_val) + " " + str(front_val))
         temp = ""
         for val in self.state_manager.sensors:
             temp += val.current_state + " "
-        rospy.loginfo(temp)
+        # rospy.loginfo(temp)
         # rospy.loginfo(self.state_manager.right_state.current_state + " " + self.state_manager.right_front_state.current_state\
         #               + " " + self.state_manager.front_state.current_state)
         self.q_table.update_state(self.state_manager.get_state_index())
@@ -75,14 +75,16 @@ class Part1:
         rospy.init_node('project_3', anonymous=True)
         self.state_manager = StateManager()
 
+        self.Pos1 = True
         self.pose = None
         self.spawned = False
         self.actions = Actions()
         self.q_table = QTable(self.state_manager)
         self.stuck_count = 0
-        self.max_stuck = 5
+        self.max_stuck = 20
         self.prev_pose = None
         self.poses = []
+        self.Episode = 1
         self.poses.append(add_pose(0.0, 2.0, 6.15))
         # self.poses.append(add_pose(-2.0, -1.0, radians(180)))
         self.poses.append(add_pose(-1.8, -1.8, 0.0))
@@ -107,9 +109,14 @@ class Part1:
         pub.unregister()
         init_state = ModelState()
         init_state.model_name = 'turtlebot3_burger'
-        index = Random().randrange(0, len(self.poses))
+        # index = Random().randrange(0, len(self.poses))
+        # index = 0 if self.Pos1 else 1
+        index = 0
         init_state.pose = self.poses[index]
         init_state.reference_frame = 'map'
+        rospy.loginfo("Episode: " + str(self.Episode))
+        if self.Episode % 50 == 0:
+            self.q_table.decrease_epsilon()
 
         init_velocity = Twist()
         init_velocity.linear.x = init_velocity.linear.y = init_velocity.linear.z = 0
@@ -133,20 +140,29 @@ class Part1:
 
         count = 0
         total_count = 0
+        prev_prev_pose = self.get_pose()
         while not rospy.is_shutdown():
+            if self.Episode % 10 == 0:
+                self.Pos1 = not self.Pos1
+
             while count < 10:
+                if distance_2_points(self.get_pose(), prev_prev_pose) < 0.01:
+                    self.stuck_count += 1
+                # else:
                 self.q_table.next_action()
+                prev_prev_pose = self.prev_pose
+                self.prev_pose = self.get_pose()
                 count += 1
                 total_count += 1
-                if distance_2_points(self.get_pose(), self.prev_pose) < 0.05:
-                    self.stuck_count += 1
+
                 if self.stuck_count >= self.max_stuck or total_count > 1000:
-                    rospy.loginfo("Stuck for too long! resetting...")
+                    # rospy.loginfo("Stuck for too long! resetting...")
+                    self.Episode += 1
                     self.reset()
                     self.stuck_count = 0
                     total_count = 0
                     count = 0
-                self.prev_pose = self.get_pose()
+
             count = 0
             self.q_table.save_table()
 

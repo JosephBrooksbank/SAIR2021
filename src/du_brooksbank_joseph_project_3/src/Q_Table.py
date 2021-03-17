@@ -15,7 +15,8 @@ class QTable:
 
     rewards = {}
     gamma = 0.8
-    epsilon = 0.9
+    epsilon_modifier = 0
+    epsilon = 0.2
     alpha = 0.2
     dir_path = os.path.dirname(os.path.realpath(__file__))
     txt_file = dir_path + "/q_table.csv"
@@ -39,15 +40,23 @@ class QTable:
                 for frontVal in self.state_manager.sensors[2].distances:
                     for leftVal in self.state_manager.sensors[3].distances:
                         if rightVal == "too_far" \
-                                or rightVal == "too_close"\
-                                or frontVal == "too_close"\
+                                or rightVal == "too_close" \
+                                or frontVal == "too_close" \
                                 or leftVal == "too_close":
-                            self.rewards[self.state_manager.generate_state_index(rightVal, rightFrontVal, frontVal, leftVal)] = -1
+                            self.rewards[self.state_manager \
+                                .generate_state_index(rightVal, rightFrontVal, frontVal, leftVal)] = -1
 
     def update_state(self, state):
         # type: (int) -> None
         self.current_state = state
         self.changed = True
+
+    def decrease_epsilon(self):
+        self.epsilon_modifier += 1
+        rospy.loginfo("New epsilon: " + str(self.diminishing_epsilon()))
+
+    def diminishing_epsilon(self):
+        return self.epsilon + (1.0/2)**self.epsilon_modifier * 0.7
 
     def next_action(self):
         state_for_action = self.current_state
@@ -58,7 +67,7 @@ class QTable:
         # If no rewards present, go forward (for the first action)
         next_action = Actions.FORWARD
         # i is the index of the actions available to be taken at the current state
-        if random.random() < self.epsilon:
+        if random.random() < self.diminishing_epsilon():
             for i in range(len(possible_actions)):
                 if possible_actions[i] > reward:
                     next_action = i
@@ -68,8 +77,8 @@ class QTable:
         self.actions.action_list[next_action]()
         new_state = self.wait_for_state()
         # rospy.loginfo(str(new_state) + " " + str(self.rewards[new_state]))
-        if self.rewards[new_state] == 0:
-            rospy.loginfo("In Goal State!")
+        # if self.rewards[new_state] == 0:
+            # rospy.loginfo("In Goal State!")
 
         new_q = self.q_table[state_for_action, next_action] \
                 + self.alpha * \
@@ -83,7 +92,6 @@ class QTable:
         while not self.changed:
             pass
         return self.current_state
-
 
     def calculate_max_action(self, state):
         # type: (int) -> int

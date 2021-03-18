@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 import math
 import sys
-from math import radians
 from random import Random
 
 import rospy
-from enum import Enum
 from sensor_msgs.msg import LaserScan
 from gazebo_msgs.srv import SetModelState
 from gazebo_msgs.msg import ModelState, ModelStates
-import numpy as np
 from geometry_msgs.msg import Twist, Pose
-from tf.transformations import euler_from_quaternion
 
 from Actions import Actions
 from Q_Table import QTable
@@ -31,7 +27,7 @@ def add_pose(x, y, o, z=0.01):
     return temp
 
 
-class Part1:
+class Project3:
 
     def wait_for_models(self, data):
         # type: (ModelStates) -> None
@@ -47,12 +43,12 @@ class Part1:
         scan_radius = 15
 
         def get_range(lower, upper):
+            # type: (int, int) -> float
 
             end_val = sys.maxint
             for i in range(lower, upper):
                 if data.ranges[i] < end_val:
                     end_val = data.ranges[i]
-            # end_val = end_val / (upper - lower)
 
             return end_val
 
@@ -62,13 +58,9 @@ class Part1:
         front_val = get_range(-15, 15)
         left_val = get_range(80, 100)
         self.state_manager.get_readings(right_val, right_front_val, front_val, left_val)
-        # rospy.loginfo(str(right_val) + " " + str(right_front_val) + " " + str(front_val))
         temp = ""
         for val in self.state_manager.sensors:
             temp += val.current_state + " "
-        # rospy.loginfo(temp)
-        # rospy.loginfo(self.state_manager.right_state.current_state + " " + self.state_manager.right_front_state.current_state\
-        #               + " " + self.state_manager.front_state.current_state)
         self.q_table.update_state(self.state_manager.get_state_index())
 
     def __init__(self):
@@ -81,14 +73,12 @@ class Part1:
         self.actions = Actions()
         self.q_table = QTable(self.state_manager)
         self.stuck_count = 0
-        self.max_stuck = 20
+        self.max_stuck = 10
         self.prev_pose = None
         self.poses = []
         self.Episode = 1
         self.poses.append(add_pose(0.0, 2.0, 6.15))
-        # self.poses.append(add_pose(-2.0, -1.0, radians(180)))
         self.poses.append(add_pose(-1.8, -1.8, 0.0))
-        # Setting an action for each state
 
         rospy.Subscriber("/scan", LaserScan, self.laser_callback)
         rospy.Subscriber("/gazebo/model_states", ModelStates, self.wait_for_models)
@@ -99,7 +89,6 @@ class Part1:
     def get_pose(self):
         return [self.pose.position.x, self.pose.position.y]
 
-    # TODO add multiple respawn points
     def reset(self):
         pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         command = Twist()
@@ -109,9 +98,7 @@ class Part1:
         pub.unregister()
         init_state = ModelState()
         init_state.model_name = 'turtlebot3_burger'
-        # index = Random().randrange(0, len(self.poses))
-        # index = 0 if self.Pos1 else 1
-        index = 0
+        index = Random().randrange(0, len(self.poses))
         init_state.pose = self.poses[index]
         init_state.reference_frame = 'map'
         rospy.loginfo("Episode: " + str(self.Episode))
@@ -168,5 +155,5 @@ class Part1:
 
 
 if __name__ == '__main__':
-    project3 = Part1()
+    project3 = Project3()
     project3.main()

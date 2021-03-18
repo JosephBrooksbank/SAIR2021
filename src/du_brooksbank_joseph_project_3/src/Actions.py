@@ -16,7 +16,7 @@ class Actions:
 
     def __init__(self):
         self.move_robot = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        self.r = rospy.Rate(50)
+        self.r = rospy.Rate(2)
         self.action_list = {
             self.FORWARD: self.forward,
             self.TURN_LEFT: self.turn_left,
@@ -38,16 +38,16 @@ class Actions:
             self.r.sleep()
 
     def forward(self):
-        self.call_command(3, 0.2)
+        self.call_command(2, 0.5)
 
     def turn_right(self):
-        self.call_command(3, 0.2, radians(-10))
+        self.call_command(1, 0.3, radians(-20))
 
     def turn_left(self):
-        self.call_command(3, 0.2, radians(10))
+        self.call_command(1, 0.3, radians(20))
 
     def sharp_right(self):
-        self.call_command(3, 0.2, radians(-80))
+        self.call_command(1, 0.3, radians(-70))
 
     def sharp_left(self):
-        self.call_command(3, 0.2, radians(80))
+        self.call_command(1, 0.3, radians(70))

@@ -60,6 +60,15 @@ and making the epsilon value scale with total runs.
 Here is a video of progress so far: https://youtu.be/A8SN8WBLvF8
 
 
+### Notes: Thursday, March 18
+I was hoping to make substantial progress from Tuesday, given the new map and real time factor changes. Unfortunately, 
+it doesn't seem like any modifications I had on the system really influenced it in noticeable ways. The robot does not so
+much 'learn' as stumble forward, praying that it will randomly not crash. I am unsure why the learning works so poorly,
+but I suspect something in my implementation is incorrect. As I say in the video: Thank you for the quarter, this was a 
+very interesting class, and I realized that robotics may be something I want to pursue as a career at some point. Good
+luck next quarter!
+
+Video: https://youtu.be/LqRxellreq0
 
 
 

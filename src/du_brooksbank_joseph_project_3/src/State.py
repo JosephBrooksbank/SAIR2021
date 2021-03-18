@@ -1,15 +1,13 @@
 import math
 import sys
 
-import rospy
-
 
 class State:
     all_distances = {
-        "too_close": 0.2,
-        "close": 0.50,
-        "medium": 0.6,
-        "far": 0.8,
+        "too_close": 0.4,
+        "close": 0.60,
+        "medium": 0.8,
+        "far": 1.0,
         "too_far": sys.maxint
     }
     distances_index = {
@@ -64,21 +62,15 @@ class Left(State):
 
 
 class StateManager:
-    sensors = []
-    sensors.append(RightState())
-    sensors.append(RightFrontState())
-    sensors.append(Front())
-    sensors.append(Left())
-    # right_state = RightState()
-    # right_front_state = RightFrontState()
-    # front_state = Front()
+    sensors = [RightState(), RightFrontState(), Front(), Left()]
+
     NUM_STATES = int(math.pow(len(State.all_distances), len(sensors)))
 
     def __init__(self):
         pass
 
     def get_readings(self, *args):
-        # type: (*int) -> None
+        # type: (*float) -> None
         if len(args) != len(self.sensors):
             exit(-1)
         for i in range(len(args)):
@@ -86,8 +78,8 @@ class StateManager:
 
     def get_state_index(self):
         # type: () -> int
-        # returns a unique index for every combination of the 3 states (max of 125 states, but only using 40)
-        # Generating index assuming all 3 observation spaces have 5 discrete distance zones, because I couldn't think
+        # returns a unique index for every combination of the states
+        # Generating index assuming all observation spaces have 5 discrete distance zones, because I couldn't think
         # of a way to do it otherwise. There will be empty holes in the Q table, but that is fine.
         index = 0
         for i in range(len(self.sensors)):

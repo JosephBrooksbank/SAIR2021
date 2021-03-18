@@ -1,3 +1,4 @@
+# coding=utf-8
 import numpy as np
 import os
 
@@ -63,11 +64,13 @@ class QTable:
 
         # Grabbing the column of actions available for the current state
         possible_actions = self.q_table[state_for_action, :]
+        # not very fancy but python doesn't have good "max and min" numbers that I could find
         reward = -1000000.0
         # If no rewards present, go forward (for the first action)
         next_action = Actions.FORWARD
-        # i is the index of the actions available to be taken at the current state
-        if random.random() < self.diminishing_epsilon():
+        # Adding randomness of epsilon
+        if random.random() > self.diminishing_epsilon():
+            # finding max reward for next action
             for i in range(len(possible_actions)):
                 if possible_actions[i] > reward:
                     next_action = i
@@ -76,16 +79,13 @@ class QTable:
             next_action = random.randint(0, len(possible_actions) - 1)
         self.actions.action_list[next_action]()
         new_state = self.wait_for_state()
-        # rospy.loginfo(str(new_state) + " " + str(self.rewards[new_state]))
-        # if self.rewards[new_state] == 0:
-            # rospy.loginfo("In Goal State!")
 
-        new_q = self.q_table[state_for_action, next_action] \
+        # Setting value in PREVIOUS q table step to be: Q(S,A) + alpha * (Reward + gamma*Max(Q(S',A')) - Q(S,A))
+        self.q_table[state_for_action, next_action] = self.q_table[state_for_action, next_action] \
                 + self.alpha * \
                 (self.rewards[state_for_action] + self.gamma * \
                  self.calculate_max_action(new_state) - \
                  self.q_table[state_for_action, next_action])
-        self.q_table[state_for_action, next_action] = new_q
 
     def wait_for_state(self):
         self.changed = False
@@ -95,7 +95,7 @@ class QTable:
 
     def calculate_max_action(self, state):
         # type: (int) -> int
-        max_reward = -1000000000000000.0
+        max_reward = -1000000000000000.0  # Again with this ¯\_(ツ)_/¯
         possible_actions = self.q_table[state, :]
         for i in range(len(possible_actions)):
             if possible_actions[i] > max_reward:
@@ -107,7 +107,6 @@ class QTable:
         np.savetxt(self.txt_file, self.q_table, fmt='%f', delimiter=",")
 
     def load_table(self):
-
         if os.path.exists(self.txt_file):
             self.q_table = np.loadtxt(self.txt_file, delimiter=",")
         else:
